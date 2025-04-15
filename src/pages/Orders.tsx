@@ -22,7 +22,18 @@ import {
   ChevronDown,
   ChevronUp,
   ListFilter,
-  CheckSquare
+  CheckSquare,
+  MessageSquare,
+  ChevronsRight,
+  ClipboardCheck,
+  MapPin,
+  Receipt,
+  User,
+  Smartphone,
+  Mail,
+  Info,
+  MoreHorizontal,
+  Copy
 } from "lucide-react";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
@@ -109,6 +120,7 @@ interface EnhancedOrder {
     coupon_type: string;
   } | null;
   discount_amount?: number;
+  notes?: string;
 }
 
 // Define the order status options
@@ -1178,21 +1190,45 @@ const Orders = () => {
 
       {/* Order Details Dialog */}
       <Dialog open={viewOrderDialog} onOpenChange={setViewOrderDialog}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[900px] h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="border-b border-border pb-4 flex-shrink-0">
             <div className="flex justify-between items-center">
-              <div>
-                <DialogTitle className="text-xl">Order Details</DialogTitle>
-            <DialogDescription>
-                  Order #{selectedOrder?.id.substring(0, 8)}
-            </DialogDescription>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col">
+                  <DialogTitle className="flex items-center gap-2 text-xl">
+                    Order #{selectedOrder?.id.substring(0, 8)}
+                    <button 
+                      onClick={() => {
+                        if (selectedOrder) {
+                          navigator.clipboard.writeText(selectedOrder.id);
+                          setSuccessMessage("Order ID copied to clipboard");
+                          setTimeout(() => setSuccessMessage(""), 3000);
+                        }
+                      }}
+                      className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </DialogTitle>
+                  <DialogDescription className="flex items-center gap-1.5 mt-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>
+                      {selectedOrder && format(new Date(selectedOrder.created_at), 'PPPP')} 
+                      <span className="text-primary ml-1">
+                        ({selectedOrder && format(new Date(selectedOrder.created_at), 'p')})
+                      </span>
+                    </span>
+                  </DialogDescription>
+                </div>
               </div>
               
               {selectedOrder && (
                 <div className="flex items-center gap-2">
-                  <Badge 
-                    className={`${statusColors[selectedOrder.status] || ""} px-3 py-1`}
-                  >
+                  <Badge variant="outline" className={`px-2 py-1 ${statusColors[selectedOrder.status] || "bg-gray-100 text-gray-800"}`}>
+                    {selectedOrder.status === "Processing" && <RefreshCw className="h-3 w-3 mr-1 inline animate-spin" />}
+                    {selectedOrder.status === "Shipped" && <TruckIcon className="h-3 w-3 mr-1 inline" />}
+                    {selectedOrder.status === "Delivered" && <PackageCheck className="h-3 w-3 mr-1 inline" />}
+                    {selectedOrder.status === "Cancelled" && <Ban className="h-3 w-3 mr-1 inline" />}
                     {selectedOrder.status}
                   </Badge>
                   <Button
@@ -1214,137 +1250,240 @@ const Orders = () => {
             </div>
           </DialogHeader>
           
-          <ScrollArea className="flex-grow">
+          <ScrollArea className="flex-1 pr-2 overflow-y-auto max-h-[calc(85vh-10rem)]">
             {selectedOrder && (
               <div className="space-y-6 py-4 px-1">
-                <div className="flex justify-between items-start gap-4 flex-wrap">
-                  <div className="min-w-[200px] flex-1">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>Created on {format(new Date(selectedOrder.created_at), 'PPP p')}</span>
-                  </div>
-                    <div className="flex flex-wrap gap-x-6 gap-y-2">
-                  <div>
-                        <h3 className="text-xs font-medium text-muted-foreground">Payment Method</h3>
-                        <p className="text-sm font-medium flex items-center gap-1.5 mt-1">
-                          <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                          {selectedOrder.payment}
-                        </p>
-                  </div>
-                  <div>
-                        <h3 className="text-xs font-medium text-muted-foreground">Items</h3>
-                        <p className="text-sm font-medium flex items-center gap-1.5 mt-1">
-                          <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
-                          {selectedOrder.orderItems?.length || 0} items
-                        </p>
-                  </div>
+                {/* Order Status Timeline */}
+                <div className="mb-6 bg-accent/30 p-4 rounded-lg border border-border">
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                    <ClipboardCheck className="h-4 w-4 text-primary" />
+                    Order Status Timeline
+                  </h3>
+                  <div className="relative">
+                    <div className="absolute left-3 top-0 h-full w-0.5 bg-muted-foreground/20"></div>
+                    <div className="space-y-4 relative">
+                      {["Pending", "Processing", "Shipped", "Delivered"].map((step, index) => {
+                        const statusLower = selectedOrder.status.toLowerCase();
+                        const stepLower = step.toLowerCase();
+                        const isCompleted = 
+                          (statusLower === "delivered" && ["pending", "processing", "shipped"].includes(stepLower)) ||
+                          (statusLower === "shipped" && ["pending", "processing"].includes(stepLower)) || 
+                          (statusLower === "processing" && ["pending"].includes(stepLower));
+                        const isCurrent = statusLower === stepLower;
+                        const isUpcoming = 
+                          (statusLower === "pending" && ["processing", "shipped", "delivered"].includes(stepLower)) ||
+                          (statusLower === "processing" && ["shipped", "delivered"].includes(stepLower)) ||
+                          (statusLower === "shipped" && ["delivered"].includes(stepLower));
+                        const isCancelled = statusLower === "cancelled";
+                        
+                        return (
+                          <div key={step} className="flex items-start gap-3 ml-0.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center z-10 mt-0.5
+                              ${isCompleted ? "bg-green-500 text-white" : ""}
+                              ${isCurrent ? "bg-primary text-white" : ""}
+                              ${isUpcoming && !isCancelled ? "bg-muted-foreground/20" : ""}
+                              ${isCancelled ? "bg-red-500/20 border border-red-500" : ""}
+                            `}>
+                              {isCompleted && <Check className="h-3 w-3" />}
+                              {isCurrent && step === "Processing" && <RefreshCw className="h-3 w-3 animate-spin" />}
+                              {isCurrent && step === "Shipped" && <TruckIcon className="h-3 w-3" />}
+                              {isCurrent && step === "Delivered" && <PackageCheck className="h-3 w-3" />}
+                            </div>
+                            <div className="flex-1">
+                              <div className={`font-medium text-sm 
+                                ${isCompleted ? "text-green-600" : ""}
+                                ${isCurrent ? "text-primary" : ""}
+                                ${isUpcoming && !isCancelled ? "text-muted-foreground" : ""}
+                                ${isCancelled ? "text-red-500/70" : ""}
+                              `}>
+                                {step}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {isCompleted || isCurrent ? (
+                                  <>
+                                    {isCompleted && "Completed"}
+                                    {isCurrent && step === "Pending" && "Awaiting processing"}
+                                    {isCurrent && step === "Processing" && "Being prepared"}
+                                    {isCurrent && step === "Shipped" && "On the way"}
+                                    {isCurrent && step === "Delivered" && "Delivered successfully"}
+                                    {isCancelled && "Cancelled"}
+                                  </>
+                                ) : (
+                                  <span className="opacity-70">Upcoming</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {isCurrent && (
+                              <Badge variant="outline" className="text-xs h-5">Current</Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                      
+                      {selectedOrder.status.toLowerCase() === "cancelled" && (
+                        <div className="flex items-start gap-3 ml-0.5">
+                          <div className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center z-10 mt-0.5">
+                            <Ban className="h-3 w-3" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-red-500">Cancelled</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Order was cancelled
+                            </div>
+                          </div>
+                          <Badge variant="destructive" className="text-xs h-5">Cancelled</Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                  <div className="flex flex-col items-end">
-                    <div className="text-sm font-medium text-muted-foreground mb-1">Total Amount</div>
-                    <div className="text-2xl font-bold">{selectedOrder.displayTotal}</div>
-                    
-                    {selectedOrder.discount_amount > 0 && (
-                      <div className="text-xs text-green-600 font-medium mt-1">
-                        includes discount of np{selectedOrder.discount_amount.toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="bg-muted/30 rounded-lg p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                  {/* Left Column (3 parts wide) */}
+                  <div className="lg:col-span-3 space-y-4">
+                    <div className="bg-card rounded-lg p-4 border border-border">
                       <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                        <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                        <ShoppingBag className="h-4 w-4 text-primary" />
                         Order Items
                       </h3>
                       <div className="space-y-3">
                         {selectedOrder.orderItems?.map((item, i) => (
-                          <div key={item.id} className="flex items-center justify-between pb-3 border-b border-border last:border-0 last:pb-0">
+                          <div key={item.id} className="flex items-center justify-between p-3 rounded-md bg-accent/30 hover:bg-accent/50 transition-colors">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-muted rounded flex items-center justify-center text-muted-foreground">
-                                <ShoppingBag className="h-4 w-4" />
+                              <div className="w-12 h-12 bg-primary/10 rounded-md flex items-center justify-center text-primary flex-shrink-0">
+                                <ShoppingBag className="h-5 w-5" />
                               </div>
-                <div>
+                              <div>
                                 <p className="text-sm font-medium">{item.product_name}</p>
-                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                  <span>np{item.unit_price.toFixed(2)}</span>
-                                  <span>•</span>
-                                  <span>Qty: {item.quantity}</span>
-                                </p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                  <span className="flex items-center gap-1">
+                                    <Receipt className="h-3 w-3" />
+                                    np{item.unit_price.toFixed(2)}
+                                  </span>
+                                  <span>×</span>
+                                  <span className="flex items-center gap-1">
+                                    <CheckSquare className="h-3 w-3" />
+                                    {item.quantity}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                            <p className="text-sm font-semibold">
-                              np{item.subtotal.toFixed(2)}
-                            </p>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold">
+                                np{item.subtotal.toFixed(2)}
+                              </p>
+                              {item.quantity > 1 && (
+                                <p className="text-xs text-muted-foreground">
+                                  (np{item.unit_price.toFixed(2)} each)
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
                     
                     {selectedOrder.coupon && (
-                      <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-100 dark:border-blue-900/30">
+                      <div className="bg-blue-50/80 dark:bg-blue-950/30 rounded-lg p-4 border border-blue-100 dark:border-blue-900/40">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                            <Receipt className="h-4 w-4" />
                             Applied Discount
                           </h3>
-                          <Badge variant="outline" className="bg-blue-100/80 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                          <Badge variant="outline" className="bg-blue-100/90 text-blue-700 dark:bg-blue-900/70 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                             {selectedOrder.coupon.code}
                           </Badge>
                         </div>
                         <div className="text-xs text-blue-700 dark:text-blue-400">
                           {selectedOrder.coupon.coupon_type === 'percent' ? (
-                            <p>Discount of {selectedOrder.coupon.discount}% applied to order</p>
+                            <p>Discount of {selectedOrder.coupon.discount}% applied to this order</p>
                           ) : (
-                            <p>Fixed discount of np{selectedOrder.coupon.discount} applied to order</p>
+                            <p>Fixed discount of np{selectedOrder.coupon.discount} applied to this order</p>
                           )}
                           {selectedOrder.discount_amount > 0 && (
-                            <p className="font-medium mt-1">Saved amount: np{selectedOrder.discount_amount.toFixed(2)}</p>
+                            <p className="font-medium mt-1 text-sm">Saved amount: np{selectedOrder.discount_amount.toFixed(2)}</p>
                           )}
                         </div>
                       </div>
                     )}
+                    
+                    <div className="bg-card rounded-lg p-4 border border-border">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                        Order Notes
+                      </h3>
+                      <div className="bg-muted/30 rounded-md p-3 text-sm">
+                        {selectedOrder.notes ? (
+                          <p>{selectedOrder.notes}</p>
+                        ) : (
+                          <p className="text-muted-foreground italic">No special instructions or notes for this order.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="bg-muted/30 rounded-lg p-4">
-                      <h3 className="text-sm font-medium mb-3">Customer Information</h3>
-                      <div className="space-y-3">
+                  {/* Right Column (2 parts wide) */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="bg-card rounded-lg p-4 border border-border">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                        <User className="h-4 w-4 text-primary" />
+                        Customer Information
+                      </h3>
+                      <div className="space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-primary">
+                          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-lg font-medium text-primary">
                               {selectedOrder.customer.charAt(0).toUpperCase()}
                             </span>
-                    </div>
-                    <div>
+                          </div>
+                          <div>
                             <p className="text-sm font-medium">{selectedOrder.customer}</p>
-                            <p className="text-xs text-muted-foreground">{selectedOrder.email}</p>
-                    </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {selectedOrder.email}
+                              </span>
+                            </div>
+                            {selectedOrder.phone_number && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                <Smartphone className="h-3 w-3" />
+                                {selectedOrder.phone_number}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 pt-2">
-                    <div>
-                            <p className="text-xs text-muted-foreground">User ID</p>
-                            <p className="text-xs font-mono mt-0.5">{selectedOrder.user_id}</p>
-                    </div>
-                    <div>
-                            <p className="text-xs text-muted-foreground">Phone</p>
-                            <p className="text-xs mt-0.5">{selectedOrder.phone_number || "Not provided"}</p>
+                        <div className="bg-muted/30 p-3 rounded-md">
+                          <div className="text-xs text-muted-foreground mb-1">Customer ID</div>
+                          <div className="text-xs font-mono flex items-center gap-1.5">
+                            {selectedOrder.user_id}
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedOrder.user_id);
+                                setSuccessMessage("Customer ID copied to clipboard");
+                                setTimeout(() => setSuccessMessage(""), 3000);
+                              }}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
                           </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                
-                    <div className="bg-muted/30 rounded-lg p-4">
-                      <h3 className="text-sm font-medium mb-3">Delivery Information</h3>
-                  {selectedOrder.delivery_address ? (
+                    
+                    <div className="bg-card rounded-lg p-4 border border-border">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Delivery Information
+                      </h3>
+                      {selectedOrder.delivery_address ? (
                         <div className="space-y-3">
                           <div className="flex items-start gap-3">
                             <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
                               <TruckIcon className="h-4 w-4 text-green-500" />
-                      </div>
+                            </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="h-5 px-1.5 text-xs">
@@ -1352,9 +1491,10 @@ const Orders = () => {
                                 </Badge>
                                 <p className="text-sm font-medium">{selectedOrder.delivery_address.address}</p>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                        {selectedOrder.delivery_address.area}, {selectedOrder.delivery_address.city}
-                      </p>
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                                <MapPin className="h-3 w-3" />
+                                {selectedOrder.delivery_address.area}, {selectedOrder.delivery_address.city}
+                              </p>
                             </div>
                           </div>
                           
@@ -1362,35 +1502,47 @@ const Orders = () => {
                             <p className="text-xs text-muted-foreground">Delivery Fee</p>
                             <p className="text-sm font-medium mt-0.5">np{selectedOrder.delivery_fee.toFixed(2)}</p>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="bg-muted/30 p-3 rounded-md text-muted-foreground text-sm flex items-center gap-1.5">
+                          <Info className="h-4 w-4" />
+                          No address information available
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No address information available</p>
-                  )}
-                </div>
-                  </div>
-                </div>
-
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <h3 className="text-sm font-medium mb-3">Order Summary</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>np{(selectedOrder.total_amount - selectedOrder.delivery_fee).toFixed(2)}</span>
-                  </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Delivery Fee</span>
-                      <span>np{selectedOrder.delivery_fee.toFixed(2)}</span>
-                  </div>
-                          {selectedOrder.discount_amount > 0 && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Discount</span>
-                        <span>-np{selectedOrder.discount_amount.toFixed(2)}</span>
-                    </div>
-                  )}
-                    <Separator className="my-2" />
-                    <div className="flex justify-between text-sm font-bold">
-                      <span>Total</span>
-                      <span>{selectedOrder.displayTotal}</span>
+                    
+                    <div className="bg-card rounded-lg p-4 border border-border">
+                      <h3 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                        <Receipt className="h-4 w-4 text-primary" />
+                        Payment Summary
+                      </h3>
+                      
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className={`w-2 h-2 rounded-full ${selectedOrder.is_cash_on_delivery ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                        <span className="text-sm font-medium">{selectedOrder.is_cash_on_delivery ? 'Cash on Delivery' : 'Card Payment'}</span>
+                      </div>
+                      
+                      <div className="space-y-2 bg-muted/30 p-3 rounded-md">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span>np{(selectedOrder.total_amount - selectedOrder.delivery_fee).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Delivery Fee</span>
+                          <span>np{selectedOrder.delivery_fee.toFixed(2)}</span>
+                        </div>
+                        {selectedOrder.discount_amount > 0 && (
+                          <div className="flex justify-between text-sm text-green-600">
+                            <span>Discount</span>
+                            <span>-np{selectedOrder.discount_amount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-bold">
+                          <span>Total</span>
+                          <span className="text-lg">{selectedOrder.displayTotal}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1398,35 +1550,54 @@ const Orders = () => {
             )}
           </ScrollArea>
           
-          <DialogFooter className="border-t border-border pt-4 mt-4">
+          <DialogFooter className="border-t border-border pt-4 mt-4 flex-shrink-0">
             <div className="flex justify-between w-full gap-4">
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`#order-invoice-${selectedOrder?.id}`} target="_blank">
-                    <Download className="h-4 w-4 mr-1" />
-                    Invoice
-                  </a>
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
-                  setViewOrderDialog(false);
-                  if (selectedOrder) {
-                    handleDeleteOrder(selectedOrder);
-                  }
-                }}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`#order-invoice-${selectedOrder?.id}`} target="_blank">
+                          <Download className="h-4 w-4 mr-1" />
+                          Invoice
+                        </a>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Download invoice PDF</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
+                        setViewOrderDialog(false);
+                        if (selectedOrder) {
+                          handleDeleteOrder(selectedOrder);
+                        }
+                      }}>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Delete this order permanently</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setViewOrderDialog(false)}>
                   Close
                 </Button>
-            <Button onClick={() => {
-              setViewOrderDialog(false);
-              if (selectedOrder) {
-                handleEditOrder(selectedOrder);
-              }
+                <Button onClick={() => {
+                  setViewOrderDialog(false);
+                  if (selectedOrder) {
+                    handleEditOrder(selectedOrder);
+                  }
                 }}>
                   Edit Status
                 </Button>
@@ -1447,7 +1618,7 @@ const Orders = () => {
           </DialogHeader>
           
           {selectedOrder && (
-            <div className="flex gap-3 items-center mb-4 bg-muted/50 p-3 rounded-md">
+            <div className="flex gap-3 items-center mb-4 bg-accent/50 p-3 rounded-md">
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground">Current Status</span>
                 <Badge 
